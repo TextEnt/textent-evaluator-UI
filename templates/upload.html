@@ -1,0 +1,61 @@
+{% extends 'base.html' %}
+
+{% block title %}Upload CSV{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card mb-4">
+            <div class="card-header">
+                <h4 class="mb-0">Upload Response Data</h4>
+            </div>
+            <div class="card-body">
+                <p class="card-text">
+                    Upload a CSV file containing LLM response data for assessment. The file must include the following columns:
+                </p>
+                <div class="bg-dark p-3 mb-3">
+                    <code class="text-light" style="word-wrap: break-word;">
+                        response_id, prompt_id, model_id, document_id, author, title, publication_date, document_length, 
+                        keep_fine_tuning, gt_period, pred_period, score_period_string, gt_timeframe, pred_timeframe, 
+                        score_period_timeframe, gt_period_reasoning, pred_period_reasoning, score_period_reasoning, 
+                        gt_location, pred_location, score_location_string, gt_location_QID, pred_location_QID, 
+                        gt_location_reasoning, pred_location_reasoning, score_location_reasoning
+                    </code>
+                </div>
+                
+                <form id="uploadForm" method="post" action="{{ url_for('upload') }}" enctype="multipart/form-data" class="upload-form">
+                    {{ form.hidden_tag() }}
+                    
+                    <div class="mb-3">
+                        {{ form.csv_file.label(class="form-label") }}
+                        {{ form.csv_file(class="form-control", accept=".csv") }}
+                        <div id="csvFileError" class="invalid-feedback">
+                            {% for error in form.csv_file.errors %}
+                                {{ error }}
+                            {% endfor %}
+                        </div>
+                        <div class="form-text">
+                            Only CSV files are accepted.
+                        </div>
+                    </div>
+                    
+                    <div class="d-grid gap-2">
+                        {{ form.submit(class="btn btn-primary") }}
+                    </div>
+                </form>
+            </div>
+        </div>
+        
+        {% if response_count > 0 %}
+        <div class="alert alert-info" role="alert">
+            <h5 class="alert-heading">Existing Responses</h5>
+            <p>You currently have {{ response_count }} response{{ 's' if response_count != 1 else '' }} in the database.</p>
+            <hr>
+            <div class="d-grid gap-2">
+                <a href="{{ url_for('assessment') }}" class="btn btn-info">Continue Assessment</a>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

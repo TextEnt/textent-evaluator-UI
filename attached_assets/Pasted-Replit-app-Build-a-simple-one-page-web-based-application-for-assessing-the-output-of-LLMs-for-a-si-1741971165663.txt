@@ -1,0 +1,20 @@
+Replit app 
+
+Build a simple one-page web-based application for assessing the output of LLMs for a simple NLP task (prediction of fictional time and space in French theatre plays).
+The app shows the model prediction, and allows the user to insert one or more scores. LLM predictions are pre-computed and will be uploaded to the application as a CSV file.
+
+The page presents three elements:
+A short description of the input document (author, title, publication date)
+The model’s prediction for “time” with an input field for inserting a value between 0-1 (should be validated)
+The model’s prediction for “space” with an input field for inserting a value between 0-1 (should be validated)
+Tooltips should appear when hovering on the input fields, and should display the assessment criteria (to be provided in a config file).
+A progress bar showing how many responses have been assessed and how many still remain. 
+
+Functionalities:
+User starts a new job by uploading a CSV with a predefined structure; the input file should be validated for compliance.
+Here is the list of column headers in the input CSV file: "response_id" , "prompt_id" , "model_id" , "document_id" , "author" , "title" , "publication_date" , "document_length" , "keep_fine_tuning" , "gt_period" , "pred_period" , "score_period_string" , "gt_timeframe" , "pred_timeframe" , "score_period_timeframe" , "gt_period_reasoning" , "pred_period_reasoning" , "score_period_reasoning" , "gt_location" , "pred_location" , "score_location_string" , "gt_location_QID" , "pred_location_qid" , "score_location_qid" , "gt_location_reason" , "pred_location_reasoning" , "score_location_reasoning" , "total_score"
+User can move back and forth between answers. Every time a score is entered by the user, it should be persisted in a database (or written directly to a file for simplicity).
+User should be able to search through the responses
+User can export the results at any time to CSV.
+User authentication: it should be kept as simple as possible (sign up/in, then login with username and password)
+

@@ -1,0 +1,291 @@
+{% extends "base.html" %}
+
+{% block title %}Assessment - LLM Assessment Tool{% endblock %}
+
+{% block content %}
+<div class="row mb-3">
+    <div class="col-md-8">
+        <h2><i class="fas fa-pen-fancy me-2"></i>LLM Output Assessment</h2>
+        <p class="lead">Review and score the model's predictions for time and space.</p>
+    </div>
+    <div class="col-md-4 text-md-end">
+        <form method="POST" action="{{ url_for('export', file_id=file_id) }}">
+            {{ export_form.hidden_tag() }}
+            {{ export_form.submit(class="btn btn-success") }}
+        </form>
+    </div>
+</div>
+
+<!-- Progress bar -->
+<div class="card mb-4">
+    <div class="card-body p-3">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <span>Assessment progress:</span>
+            <span><strong>{{ assessed_count }}</strong> of {{ total_responses }} assessed ({{ current_index }} / {{ total_responses }} current)</span>
+        </div>
+        <div class="progress">
+            <div class="progress-bar bg-primary" role="progressbar" 
+                 style="width: {{ (assessed_count / total_responses * 100) if total_responses > 0 else 0 }}%" 
+                 aria-valuenow="{{ assessed_count }}" 
+                 aria-valuemin="0" 
+                 aria-valuemax="{{ total_responses }}">
+                {{ assessed_count }}/{{ total_responses }}
+            </div>
+        </div>
+    </div>
+</div>
+
+
+
+<!-- Document info -->
+<div class="card document-info mb-4">
+    <div class="card-header bg-dark">
+        <h4 class="mb-0">Document Information</h4>
+    </div>
+    <div class="card-body py-2">
+        <div class="row align-items-center">
+            <div class="col-md-3">
+                <span class="fw-bold me-1">Model:</span>
+                <span>{{ response.model_name or response.model_id or 'N/A' }}</span>
+            </div>
+            <div class="col-md-2">
+                <span class="fw-bold me-1">Prompt:</span>
+                <span>{{ response.prompt_id or 'N/A' }}</span>
+            </div>
+            <div class="col-md-3">
+                <span class="fw-bold me-1">Author:</span>
+                <span>{{ response.author or 'N/A' }}</span>
+            </div>
+            <div class="col-md-2">
+                <span class="fw-bold me-1">Title:</span>
+                <span>{{ response.title or 'N/A' }}</span>
+            </div>
+            <div class="col-md-2">
+                <span class="fw-bold me-1">Date:</span>
+                <span>{{ response.publication_date or 'N/A' }}</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Assessment form -->
+<div class="row">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header bg-dark">
+                <h4 class="mb-0">Prediction Assessment</h4>
+            </div>
+            <div class="card-body">
+                <form id="assessment-form" method="POST" action="{{ url_for('submit_assessment', file_id=file_id, response_id=response.id) }}">
+                    {{ form.hidden_tag() }}
+                    <!-- Hidden input for next response navigation -->
+                    <input type="hidden" name="next_response" id="next_response_input" value="">
+                    
+                    <div class="row mb-4">
+                        <div class="col-md-6">
+                            <div class="card h-100">
+                                <div class="card-header">Time Period (string)</div>
+                                <div class="card-body">
+                                    <div class="row mb-3">
+                                        <div class="col-md-6">
+                                            <div class="border rounded p-2 h-100">
+                                                <label class="fw-bold">Ground Truth:</label>
+                                                <p class="mb-0">{{ response.gt_period or 'N/A' }}</p>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <div class="border rounded p-2 h-100">
+                                                <label class="fw-bold">Model Prediction:</label>
+                                                <p class="mb-0">{{ response.pred_period or 'N/A' }}</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label fw-bold">
+                                            Score:
+                                            <i class="fas fa-info-circle ms-1" data-bs-toggle="tooltip" data-bs-placement="top" 
+                                               title="{{ criteria.get('period_string') }}"></i>
+                                        </label>
+                                        <div class="btn-group w-100" role="group">
+                                            {% for value, label in form.score_period_string.choices %}
+                                            <div class="form-check form-check-inline flex-grow-1 text-center">
+                                                <input class="btn-check" type="radio" name="score_period_string" id="score_period_string_{{ value }}" value="{{ value }}" {% if form.score_period_string.data == value %}checked{% endif %}>
+                                                <label class="btn btn-outline-primary w-100" for="score_period_string_{{ value }}">{{ label }}</label>
+                                            </div>
+                                            {% endfor %}
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="card-header">Time Period (interval)</div>
+                                <div class="card-body">
+                                    <div class="row mb-3">
+                                        <div class="col-md-6">
+                                            <div class="border rounded p-2 h-100">
+                                                <label class="fw-bold">Ground Truth:</label>
+                                                <p class="mb-0">{{ response.gt_timeframe or 'N/A' }}</p>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <div class="border rounded p-2 h-100">
+                                                <label class="fw-bold">Model Prediction:</label>
+                                                <p class="mb-0">{{ response.pred_timeframe or 'N/A' }}</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label fw-bold">
+                                            Score:
+                                            <i class="fas fa-info-circle ms-1" data-bs-toggle="tooltip" data-bs-placement="top" 
+                                               title="{{ criteria.get('period_interval', 'Assess accuracy of predicted time interval (0-1)') }}"></i>
+                                        </label>
+                                        <div class="btn-group w-100" role="group">
+                                            {% for value, label in form.score_period_timeframe.choices %}
+                                            <div class="form-check form-check-inline flex-grow-1 text-center">
+                                                <input class="btn-check" type="radio" name="score_period_timeframe" id="score_period_timeframe_{{ value }}" value="{{ value }}" {% if form.score_period_timeframe.data == value %}checked{% endif %}>
+                                                <label class="btn btn-outline-primary w-100" for="score_period_timeframe_{{ value }}">{{ label }}</label>
+                                            </div>
+                                            {% endfor %}
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="card-header">Reasoning</div>
+                                <div class="card-body">
+                                    <div class="mb-3">
+                                        <label class="fw-bold">Annotator</label>
+                                        <p><small class="text-muted">
+                                            {{ response.gt_period_reason or response.gt_period_reasoning or 'No reasoning provided' }}
+                                        </small></p>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="fw-bold">Model</label>
+                                        <p><small class="text-muted">
+                                            {{ response.pred_period_reasoning or 'No reasoning provided' }}
+                                        </small></p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <div class="card h-100">
+                                <div class="card-header">Location (string)</div>
+                                <div class="card-body">
+                                    <div class="row mb-3">
+                                        <div class="col-md-6">
+                                            <div class="border rounded p-2 h-100">
+                                                <label class="fw-bold">Preferred Location:</label>
+                                                <p class="mb-0">{{ response.gt_preferred_location or response.gt_location or 'N/A' }}</p>
+                                                
+                                                {% if response.gt_accepted_locations %}
+                                                <label class="fw-bold mt-2">Accepted Locations:</label>
+                                                <p class="mb-0">{{ response.gt_accepted_locations }}</p>
+                                                {% endif %}
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <div class="border rounded p-2 h-100">
+                                                <label class="fw-bold">Model Prediction:</label>
+                                                <p class="mb-0">{{ response.pred_location or 'N/A' }}</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label fw-bold">
+                                            Score:
+                                            <i class="fas fa-info-circle ms-1" data-bs-toggle="tooltip" data-bs-placement="top" 
+                                               title="{{ criteria.get('location_string', 'Assess accuracy of predicted location string (0-1)') }}"></i>
+                                        </label>
+                                        <div class="btn-group w-100" role="group">
+                                            {% for value, label in form.score_location_string.choices %}
+                                            <div class="form-check form-check-inline flex-grow-1 text-center">
+                                                <input class="btn-check" type="radio" name="score_location_string" id="score_location_string_{{ value }}" value="{{ value }}" {% if form.score_location_string.data == value %}checked{% endif %}>
+                                                <label class="btn btn-outline-primary w-100" for="score_location_string_{{ value }}">{{ label }}</label>
+                                            </div>
+                                            {% endfor %}
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="card-header">Location (QID)</div>
+                                <div class="card-body">
+                                    <div class="row mb-3">
+                                        <div class="col-md-6">
+                                            <div class="border rounded p-2 h-100">
+                                                <label class="fw-bold">Preferred Location QID:</label>
+                                                <p class="mb-0">{{ response.gt_preferred_location_QID or response.gt_location_QID or 'N/A' }}</p>
+                                                
+                                                {% if response.gt_acceptable_location_QIDs %}
+                                                <label class="fw-bold mt-2">Acceptable Location QIDs:</label>
+                                                <p class="mb-0">{{ response.gt_acceptable_location_QIDs }}</p>
+                                                {% endif %}
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <div class="border rounded p-2 h-100">
+                                                <label class="fw-bold">Model Prediction:</label>
+                                                <p class="mb-0">{{ response.pred_location_qid or 'N/A' }}</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label fw-bold">
+                                            Score:
+                                            <i class="fas fa-info-circle ms-1" data-bs-toggle="tooltip" data-bs-placement="top" 
+                                               title="{{ criteria.get('location_qid', 'Assess accuracy of predicted period string (0-1)') }}"></i>
+                                        </label>
+                                        <div class="btn-group w-100" role="group">
+                                            {% for value, label in form.score_location_qid.choices %}
+                                            <div class="form-check form-check-inline flex-grow-1 text-center">
+                                                <input class="btn-check" type="radio" name="score_location_qid" id="score_location_qid_{{ value }}" value="{{ value }}" {% if form.score_location_qid.data == value %}checked{% endif %}>
+                                                <label class="btn btn-outline-primary w-100" for="score_location_qid_{{ value }}">{{ label }}</label>
+                                            </div>
+                                            {% endfor %}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="card-header">Reasoning</div>
+                                <div class="card-body">
+                                    <div class="mb-3">
+                                        <label class="fw-bold">Annotator</label>
+                                        <p><small class="text-muted">
+                                            {{ response.gt_location_reason or response.gt_location_reasoning or 'No reasoning provided' }}
+                                        </small></p>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="fw-bold">Model</label>
+                                        <p><small class="text-muted">
+                                            {{ response.pred_location_reasoning or 'No reasoning provided' }}
+                                        </small></p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    
+                    </div>
+                    
+                    <div class="d-grid">
+                        {{ form.submit(class="btn btn-primary btn-lg") }}
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Navigation buttons -->
+<div class="assessment-nav mt-4 text-end">
+    {% if next_id %}
+    <a href="#" class="btn btn-primary btn-next" data-response-id="{{ next_id }}">
+        Next Response <i class="fas fa-arrow-right ms-1"></i>
+    </a>
+    {% else %}
+    <button class="btn btn-primary disabled">
+        Next Response <i class="fas fa-arrow-right ms-1"></i>
+    </button>
+    {% endif %}
+</div>
+
+<div class="mt-4 text-center text-muted">
+    <small><i class="fas fa-keyboard me-1"></i> Tip: Use right arrow key to navigate to the next response</small>
+</div>
+{% endblock %}

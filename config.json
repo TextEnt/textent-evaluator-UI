@@ -1,0 +1,8 @@
+{
+  "assessment_criteria": {
+    "period_string": "Rate the accuracy of the model's time period prediction. Score 0 if the period in the prediction is different from the one in the reference; score 0.5 if the period in the prediction is broader or narrower than the one in the reference; score 1.0 if the period in the prediction is the same as (or equivalent to) the one in the reference.",
+    "period_interval": "Rate the accuracy of the model's time period prediction. Score 0 if there is no overlap between the prediction interval and the reference interval; score 0.5 if the prediction interval and the reference interval partly overlap; score 1.0 if the prediction interval coincides with the reference interval.",
+    "location_string": "Rate the accuracy of the model's location prediction. Score 0 if the prediction location and the reference location differ, and if the prediction location is not contained in the field `gt_accepted_locations`; score 0.5 if the location in the prediction is contained in the field `gt_accepted_locations`; score 1.0 if the location in the prediction is the same as (or equivalent to) the one in the reference",
+    "location_qid": "Rate the accuracy of the model's location prediction. Score 0 if the prediction location QID and the reference location QID differ, and if the prediction location QID is not contained in the field `gt_acceptable_location_QIDs`; score 0.5 if the location in the prediction is contained in the field `gt_acceptable_location_QIDs`; score 1 if if the location QID in the prediction is the same as the one in the reference."
+  }
+}

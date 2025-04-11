@@ -1,0 +1,426 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - LLM Assessment Tool{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-md-12">
+        <h2><i class="fas fa-tachometer-alt me-2"></i>Assessment Dashboard</h2>
+        <p class="lead">Upload a CSV file with LLM responses to start assessment.</p>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Upload form section -->
+    <div class="col-md-4 mb-4">
+        <div class="card h-100">
+            <div class="card-header bg-dark">
+                <h4><i class="fas fa-upload me-2"></i>Upload CSV</h4>
+            </div>
+            <div class="card-body">
+                <form method="POST" action="{{ url_for('dashboard') }}" enctype="multipart/form-data">
+                    {{ upload_form.hidden_tag() }}
+                    
+                    <div class="mb-3">
+                        <label for="csv_file" class="form-label">Select CSV File</label>
+                        {{ upload_form.csv_file(class="form-control", id="csv_file") }}
+                        {% for error in upload_form.csv_file.errors %}
+                        <div class="invalid-feedback d-block">{{ error }}</div>
+                        {% endfor %}
+                        <div class="form-text">
+                            CSV files with any fields can be uploaded. Missing <code>response_id</code> will be auto-generated.
+                            <a href="#" data-bs-toggle="modal" data-bs-target="#csvInfoModal">
+                                <i class="fas fa-info-circle"></i> See all supported fields
+                            </a>
+                        </div>
+                    </div>
+                    
+                    <div class="d-grid">
+                        {{ upload_form.submit(class="btn btn-primary") }}
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Search section -->
+    <div class="col-md-8 mb-4">
+        <div class="card h-100">
+            <div class="card-header bg-dark">
+                <h4><i class="fas fa-search me-2"></i>Search Responses</h4>
+            </div>
+            <div class="card-body">
+                <form method="POST" action="{{ url_for('search') }}" id="search-form">
+                    {{ search_form.hidden_tag() }}
+                    
+                    <div class="input-group mb-3">
+                        {{ search_form.query(class="form-control", placeholder="Search by author, title, response ID, location, period...") }}
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-search"></i> Search
+                        </button>
+                    </div>
+                    <small class="form-text text-muted mb-3">
+                        <i class="fas fa-info-circle me-1"></i>
+                        Search works across metadata, locations, periods, and IDs.
+                    </small>
+                </form>
+                
+                {% if search_results %}
+                <div class="search-results">
+                    <h5>Search Results:</h5>
+                    <hr>
+                    {% for file_id, result in search_results.items() %}
+                    <div class="mb-4">
+                        <h6>{{ result.file.filename }}</h6>
+                        <div class="list-group">
+                            {% for response in result.responses %}
+                            <a href="{{ url_for('assessment', file_id=file_id, response_id=response.id) }}" class="list-group-item list-group-item-action">
+                                <div class="d-flex w-100 justify-content-between">
+                                    <h6 class="mb-1">{{ response.title or response.response_id }}</h6>
+                                    <small>{{ response.author or 'No author' }}</small>
+                                </div>
+                                <div class="d-flex justify-content-between align-items-start mb-1">
+                                    <div>
+                                        <small class="text-muted me-2">ID: {{ response.response_id }}</small>
+                                        {% if response.model_name or response.model_id %}
+                                        <small class="text-muted me-2">Model: {{ response.model_name or response.model_id }}</small>
+                                        {% endif %}
+                                    </div>
+                                    <small class="badge bg-secondary">{{ response.publication_date or 'No date' }}</small>
+                                </div>
+                                <div class="mb-1">
+                                    <small class="text-muted">Time:</small> {{ response.pred_period or 'N/A' }} {% if response.pred_timeframe %}({{ response.pred_timeframe }}){% endif %}
+                                </div>
+                                <div class="mb-1">
+                                    <small class="text-muted">Space:</small> {{ response.pred_location or 'N/A' }}
+                                </div>
+                                {% if response.assessment %}
+                                <div class="d-flex">
+                                    <span class="badge bg-info me-2">Time: {{ response.assessment.score_time }}</span>
+                                    <span class="badge bg-info">Space: {{ response.assessment.score_space }}</span>
+                                </div>
+                                {% endif %}
+                            </a>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Uploaded files section -->
+<div class="row">
+    <div class="col-md-12">
+        <h3 class="mb-3"><i class="fas fa-file-csv me-2"></i>Your Files</h3>
+        
+        {% if file_stats %}
+        <div class="row row-cols-1 row-cols-md-2 g-4">
+            {% for stat in file_stats %}
+            <div class="col">
+                <div class="card h-100 assessment-card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">{{ stat.file.filename }}</h5>
+                        <span class="badge bg-secondary">{{ stat.file.upload_date.strftime('%Y-%m-%d %H:%M') }}</span>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <small class="text-muted">Contains {{ stat.file.total_responses }} responses for assessment</small>
+                        </div>
+                        
+                        <h6 class="mb-2">Assessment Progress</h6>
+                        <div class="progress mb-3" data-bs-toggle="tooltip" data-bs-placement="top" 
+                             title="{{ stat.file.assessed_responses }} of {{ stat.file.total_responses }} responses assessed">
+                            <div class="progress-bar bg-success" role="progressbar" 
+                                 style="width: {{ (stat.file.assessed_responses / stat.file.total_responses * 100) if stat.file.total_responses > 0 else 0 }}%" 
+                                 aria-valuenow="{{ stat.file.assessed_responses }}" 
+                                 aria-valuemin="0" 
+                                 aria-valuemax="{{ stat.file.total_responses }}">
+                                {{ stat.file.assessed_responses }}/{{ stat.file.total_responses }}
+                            </div>
+                        </div>
+                        
+                        <div class="row mb-3">
+                            <div class="col-6">
+                                <small class="text-muted">Completion: </small>
+                                <strong>{{ ((stat.file.assessed_responses / stat.file.total_responses * 100) if stat.file.total_responses > 0 else 0)|round|int }}%</strong>
+                            </div>
+                            <div class="col-6 text-end">
+                                <small class="text-muted">Remaining: </small>
+                                <strong>{{ stat.file.total_responses - stat.file.assessed_responses }}</strong>
+                            </div>
+                        </div>
+                        
+                        {% if stat.avg_scores.count > 0 %}
+                        <h6 class="mb-2">Assessment Results</h6>
+                        <div class="avg-scores mb-3">
+                            <div class="row">
+                                <div class="col-12 mb-2">
+                                    <div class="card">
+                                        <div class="card-header p-1 bg-dark text-white text-center">
+                                            <strong>Time Period</strong>
+                                        </div>
+                                        <div class="card-body p-1">
+                                            <div class="d-flex justify-content-between">
+                                                <div class="text-center p-1 border-end flex-fill">
+                                                    <small>String</small>
+                                                    <div class="fw-bold">{{ stat.avg_scores.period_string }}</div>
+                                                </div>
+                                                <div class="text-center p-1 flex-fill">
+                                                    <small>Interval</small>
+                                                    <div class="fw-bold">{{ stat.avg_scores.period_timeframe }}</div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-12">
+                                    <div class="card">
+                                        <div class="card-header p-1 bg-dark text-white text-center">
+                                            <strong>Location</strong>
+                                        </div>
+                                        <div class="card-body p-1">
+                                            <div class="d-flex justify-content-between">
+                                                <div class="text-center p-1 border-end flex-fill">
+                                                    <small>String</small>
+                                                    <div class="fw-bold">{{ stat.avg_scores.location_string }}</div>
+                                                </div>
+                                                <div class="text-center p-1 flex-fill">
+                                                    <small>QID</small>
+                                                    <div class="fw-bold">{{ stat.avg_scores.location_qid }}</div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <small class="text-muted">Based on {{ stat.avg_scores.count }} assessments</small>
+                            
+                            <form method="POST" action="{{ url_for('export', file_id=stat.file.id) }}" class="d-inline">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button type="submit" class="btn btn-sm btn-success">
+                                    <i class="fas fa-download me-1"></i> Export TSV
+                                </button>
+                            </form>
+                        </div>
+                        {% else %}
+                        <div class="alert alert-info mt-3 mb-3">
+                            <small><i class="fas fa-info-circle me-1"></i> No assessments completed yet</small>
+                        </div>
+                        {% endif %}
+                        
+                        <div class="d-flex gap-2">
+                            <a href="{{ url_for('assessment', file_id=stat.file.id, next_unassessed=True) }}" class="btn btn-primary flex-grow-1">
+                                <i class="fas fa-pen me-1"></i> Continue Assessment
+                            </a>
+                            <button type="button" class="btn btn-danger" data-bs-toggle="modal" data-bs-target="#deleteModal{{ stat.file.id }}">
+                                <i class="fas fa-trash-alt"></i>
+                            </button>
+                        </div>
+                        
+                        <!-- Delete Confirmation Modal -->
+                        <div class="modal fade" id="deleteModal{{ stat.file.id }}" tabindex="-1" aria-labelledby="deleteModalLabel{{ stat.file.id }}" aria-hidden="true">
+                            <div class="modal-dialog">
+                                <div class="modal-content">
+                                    <div class="modal-header">
+                                        <h5 class="modal-title" id="deleteModalLabel{{ stat.file.id }}">Confirm Deletion</h5>
+                                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                    </div>
+                                    <div class="modal-body">
+                                        <div class="alert alert-danger">
+                                            <i class="fas fa-exclamation-triangle me-2"></i>
+                                            <strong>Warning:</strong> This action cannot be undone.
+                                        </div>
+                                        <p>Are you sure you want to delete <strong>{{ stat.file.filename }}</strong> and all associated responses and assessments?</p>
+                                        <ul>
+                                            <li>{{ stat.file.total_responses }} responses will be deleted</li>
+                                            <li>{{ stat.file.assessed_responses }} assessments will be removed</li>
+                                            <li>All associated scores and data will be permanently lost</li>
+                                        </ul>
+                                    </div>
+                                    <div class="modal-footer">
+                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                        <form method="POST" action="{{ url_for('delete_file', file_id=stat.file.id) }}">
+                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                            <button type="submit" class="btn btn-danger">
+                                                <i class="fas fa-trash-alt me-1"></i> Delete Permanently
+                                            </button>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="alert alert-info">
+            <i class="fas fa-info-circle me-2"></i> You haven't uploaded any CSV files yet. Upload a file to start assessment.
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- CSV Fields Info Modal -->
+<div class="modal fade" id="csvInfoModal" tabindex="-1" aria-labelledby="csvInfoModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="csvInfoModalLabel">CSV/TSV File Format Information</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>Your CSV/TSV file should contain the following columns:</p>
+                
+                <p class="alert alert-info">
+                    <i class="fas fa-info-circle me-2"></i>
+                    No fields are strictly required. If <code>response_id</code> is missing, 
+                    IDs will be automatically generated.
+                </p>
+                
+                <h6 class="mt-3">Recommended Fields</h6>
+                <div class="table-responsive">
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>Category</th>
+                                <th>Field</th>
+                                <th>Description</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- Basic metadata -->
+                            <tr>
+                                <td rowspan="6">Basic metadata</td>
+                                <td><code>prompt_id</code></td>
+                                <td>ID of the prompt used</td>
+                            </tr>
+                            <tr>
+                                <td><code>model_name</code></td>
+                                <td>Name of the LLM model used</td>
+                            </tr>
+                            <tr>
+                                <td><code>document_id</code></td>
+                                <td>ID of the source document</td>
+                            </tr>
+                            <tr>
+                                <td><code>author</code></td>
+                                <td>Author of the source document</td>
+                            </tr>
+                            <tr>
+                                <td><code>title</code></td>
+                                <td>Title of the source document</td>
+                            </tr>
+                            <tr>
+                                <td><code>publication_date</code></td>
+                                <td>Publication date of the source document</td>
+                            </tr>
+                            
+                            <!-- Time/Period fields -->
+                            <tr>
+                                <td rowspan="10">Time/Period</td>
+                                <td><code>gt_period</code></td>
+                                <td>Ground truth time period</td>
+                            </tr>
+                            <tr>
+                                <td><code>pred_period</code></td>
+                                <td>Predicted time period</td>
+                            </tr>
+                            <tr>
+                                <td><code>score_period_string</code></td>
+                                <td>Automated scoring for period prediction</td>
+                            </tr>
+                            <tr>
+                                <td><code>gt_timeframe</code></td>
+                                <td>Ground truth timeframe</td>
+                            </tr>
+                            <tr>
+                                <td><code>pred_timeframe</code></td>
+                                <td>Predicted timeframe</td>
+                            </tr>
+                            <tr>
+                                <td><code>score_period_timeframe</code></td>
+                                <td>Automated scoring for timeframe prediction</td>
+                            </tr>
+                            <tr>
+                                <td><code>gt_period_reason</code></td>
+                                <td>Reason for ground truth period</td>
+                            </tr>
+                            <tr>
+                                <td><code>gt_period_reasoning</code></td>
+                                <td>Reasoning for ground truth period</td>
+                            </tr>
+                            <tr>
+                                <td><code>pred_period_reasoning</code></td>
+                                <td>Reasoning for predicted period</td>
+                            </tr>
+                            <tr>
+                                <td><code>score_period_reasoning</code></td>
+                                <td>Reasoning for period score</td>
+                            </tr>
+                            
+                            <!-- Location fields -->
+                            <tr>
+                                <td rowspan="11">Location</td>
+                                <td><code>gt_preferred_location</code></td>
+                                <td>Ground truth preferred location</td>
+                            </tr>
+                            <tr>
+                                <td><code>pred_location</code></td>
+                                <td>Predicted location</td>
+                            </tr>
+                            <tr>
+                                <td><code>score_location_string</code></td>
+                                <td>Automated scoring for location prediction</td>
+                            </tr>
+                            <tr>
+                                <td><code>gt_preferred_location_QID</code></td>
+                                <td>QID for ground truth preferred location</td>
+                            </tr>
+                            <tr>
+                                <td><code>pred_location_qid</code></td>
+                                <td>QID for predicted location</td>
+                            </tr>
+                            <tr>
+                                <td><code>score_location_qid</code></td>
+                                <td>Automated scoring for location QID</td>
+                            </tr>
+                            <tr>
+                                <td><code>gt_location_reason</code></td>
+                                <td>Reason for ground truth location</td>
+                            </tr>
+                            <tr>
+                                <td><code>pred_location_reasoning</code></td>
+                                <td>Reasoning for predicted location</td>
+                            </tr>
+                            <tr>
+                                <td><code>score_location_reasoning</code></td>
+                                <td>Reasoning for location score</td>
+                            </tr>
+                            <tr>
+                                <td><code>gt_accepted_locations</code></td>
+                                <td>Acceptable alternative locations</td>
+                            </tr>
+                            <tr>
+                                <td><code>gt_acceptable_location_QIDs</code></td>
+                                <td>QIDs for acceptable alternative locations</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
